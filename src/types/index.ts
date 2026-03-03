@@ -13,6 +13,8 @@ export interface Obra {
   // Centro de custo
   orcamentoPrevisto: number;
   responsavel: string;
+  // Progresso
+  percentualConclusao: number;
 }
 
 export interface Cliente {
@@ -206,6 +208,7 @@ export interface ResumoObra {
   margemPercentual: number;
   custoPorFuncionario: { funcionarioId: string; nome: string; total: number }[];
   custoPorCategoria: { categoria: string; total: number }[];
+  historicoMovimentacoes: (LancamentoEntrada | LancamentoSaida)[];
 }
 
 export interface ResumoSocio {

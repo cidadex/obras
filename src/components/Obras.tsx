@@ -226,14 +226,27 @@ export function Obras({ store, onViewChange }: ObrasProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-white/70">Responsável *</Label>
-                <Input
-                  value={formData.responsavel || ''}
-                  onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
-                  className="bg-white/5 border-white/10 text-white"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-white/70">Responsável *</Label>
+                  <Input
+                    value={formData.responsavel || ''}
+                    onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/70">% Conclusão</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.percentualConclusao || 0}
+                    onChange={(e) => setFormData({ ...formData, percentualConclusao: parseInt(e.target.value) || 0 })}
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -307,6 +320,20 @@ export function Obras({ store, onViewChange }: ObrasProps) {
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-4 w-4 text-white/40" />
                     <span className="text-white/60">{obra.responsavel}</span>
+                  </div>
+                </div>
+
+                {/* Progresso da obra */}
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs text-white/40 mb-1">
+                    <span>Progresso</span>
+                    <span>{obra.percentualConclusao}%</span>
+                  </div>
+                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 rounded-full transition-all" 
+                      style={{ width: `${obra.percentualConclusao}%` }}
+                    />
                   </div>
                 </div>
 

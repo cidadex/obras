@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Calculator, Split, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Calculator, Split, AlertCircle, CheckCircle, Percent, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { StoreType } from '@/hooks/useStore';
 import type { RateioItem } from '@/types';
 
@@ -18,26 +19,62 @@ interface RateioProps {
   store: StoreType;
 }
 
+interface RateioCompleto extends RateioItem {
+  categoria: string;
+  percentual: number;
+}
+
+const categoriasSaida = [
+  'Mão de Obra',
+  'Material',
+  'Equipamento',
+  'Serviço Terceirizado',
+  'Despesa Administrativa',
+  'Transporte',
+  'Outros',
+];
+
+const formasPagamento = [
+  { value: 'pix', label: 'PIX' },
+  { value: 'dinheiro', label: 'Dinheiro' },
+  { value: 'transferencia', label: 'Transferência' },
+  { value: 'cheque', label: 'Cheque' },
+];
+
 export function Rateio({ store }: RateioProps) {
+  const [activeTab, setActiveTab] = useState('valor');
   const [valorTotal, setValorTotal] = useState('');
   const [data, setData] = useState(new Date().toISOString().split('T')[0]);
   const [descricao, setDescricao] = useState('');
   const [formaPagamento, setFormaPagamento] = useState('pix');
   const [funcionarioId, setFuncionarioId] = useState('');
-  const [rateios, setRateios] = useState<RateioItem[]>([]);
+  const [rateios, setRateios] = useState<RateioCompleto[]>([]);
   const [showResult, setShowResult] = useState(false);
 
   const addRateio = () => {
-    setRateios([...rateios, { obraId: '', valor: 0 }]);
+    setRateios([...rateios, { obraId: '', valor: 0, categoria: 'Mão de Obra', percentual: 0 }]);
   };
 
   const removeRateio = (index: number) => {
     setRateios(rateios.filter((_, i) => i !== index));
   };
 
-  const updateRateio = (index: number, field: keyof RateioItem, value: any) => {
+  const updateRateio = (index: number, field: keyof RateioCompleto, value: any) => {
     const newRateios = [...rateios];
     newRateios[index] = { ...newRateios[index], [field]: value };
+    
+    // Se mudou o percentual e estamos no modo percentual, atualiza o valor
+    if (field === 'percentual' && activeTab === 'percentual') {
+      const total = parseFloat(valorTotal) || 0;
+      newRateios[index].valor = (total * value) / 100;
+    }
+    
+    // Se mudou o valor e estamos no modo valor, atualiza o percentual
+    if (field === 'valor' && activeTab === 'valor') {
+      const total = parseFloat(valorTotal) || 0;
+      newRateios[index].percentual = total > 0 ? (value / total) * 100 : 0;
+    }
+    
     setRateios(newRateios);
   };
 
@@ -45,9 +82,22 @@ export function Rateio({ store }: RateioProps) {
     return rateios.reduce((sum, r) => sum + (r.valor || 0), 0);
   };
 
-  const calcularPercentual = (valor: number) => {
+  const calcularTotalPercentual = () => {
+    return rateios.reduce((sum, r) => sum + (r.percentual || 0), 0);
+  };
+
+  const distribuirIgualmente = () => {
     const total = parseFloat(valorTotal) || 0;
-    return total > 0 ? ((valor / total) * 100).toFixed(2) : '0.00';
+    if (total === 0 || rateios.length === 0) return;
+    
+    const valorPorObra = total / rateios.length;
+    const percentualPorObra = 100 / rateios.length;
+    
+    setRateios(rateios.map(r => ({
+      ...r,
+      valor: valorPorObra,
+      percentual: percentualPorObra,
+    })));
   };
 
   const handleSubmit = () => {
@@ -67,11 +117,11 @@ export function Rateio({ store }: RateioProps) {
         tipo: 'funcionario',
         obraId: rateio.obraId,
         funcionarioId: funcionarioId || undefined,
-        categoria: 'Mão de Obra',
+        categoria: rateio.categoria,
         formaPagamento: formaPagamento as any,
         classificacao: 'custo_obra',
         descricao: `${descricao} (Rateio)`,
-        observacao: `Rateio: ${calcularPercentual(rateio.valor)}% do valor total`,
+        observacao: `Rateio: ${rateio.percentual.toFixed(2)}% do valor total - ${rateio.categoria}`,
         criadoPor: 'Admin',
       } as any);
     });
@@ -93,12 +143,10 @@ export function Rateio({ store }: RateioProps) {
     }).format(value);
   };
 
-  const formasPagamento = [
-    { value: 'pix', label: 'PIX' },
-    { value: 'dinheiro', label: 'Dinheiro' },
-    { value: 'transferencia', label: 'Transferência' },
-    { value: 'cheque', label: 'Cheque' },
-  ];
+  const totalRateio = calcularTotalRateio();
+  const totalPercentual = calcularTotalPercentual();
+  const valorTotalNum = parseFloat(valorTotal) || 0;
+  const isBalanced = Math.abs(totalRateio - valorTotalNum) < 0.01 && totalPercentual === 100;
 
   return (
     <div className="space-y-6">
@@ -174,20 +222,60 @@ export function Rateio({ store }: RateioProps) {
             />
           </div>
 
+          {/* Tabs de Rateio */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="bg-[#0f0f16] border border-white/5">
+              <TabsTrigger value="valor" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                <DollarSign className="h-4 w-4 mr-1" />
+                Por Valor
+              </TabsTrigger>
+              <TabsTrigger value="percentual" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                <Percent className="h-4 w-4 mr-1" />
+                Por Percentual
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="valor" className="mt-4">
+              <p className="text-white/50 text-sm mb-4">
+                Informe o valor fixo para cada obra. O percentual será calculado automaticamente.
+              </p>
+            </TabsContent>
+
+            <TabsContent value="percentual" className="mt-4">
+              <p className="text-white/50 text-sm mb-4">
+                Informe o percentual para cada obra. O valor será calculado automaticamente.
+              </p>
+            </TabsContent>
+          </Tabs>
+
           {/* Rateios */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-medium text-white">Distribuição entre Obras</h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addRateio}
-                className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Obra
-              </Button>
+              <div className="flex gap-2">
+                {rateios.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={distribuirIgualmente}
+                    className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                  >
+                    <Percent className="h-4 w-4 mr-2" />
+                    Distribuir Igualmente
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addRateio}
+                  className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Obra
+                </Button>
+              </div>
             </div>
 
             {rateios.length === 0 && (
@@ -217,21 +305,57 @@ export function Rateio({ store }: RateioProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="w-48">
-                  <Label className="text-white/50 text-xs mb-1 block">Valor (R$) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={rateio.valor || ''}
-                    onChange={(e) => updateRateio(index, 'valor', parseFloat(e.target.value) || 0)}
-                    placeholder="0,00"
-                    className="bg-white/5 border-white/10 text-white"
-                  />
+                <div className="flex-1">
+                  <Label className="text-white/50 text-xs mb-1 block">Categoria *</Label>
+                  <Select
+                    value={rateio.categoria}
+                    onValueChange={(value) => updateRateio(index, 'categoria', value)}
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#1a1a22] border-white/10">
+                      {categoriasSaida.map(cat => (
+                        <SelectItem key={cat} value={cat} className="text-white">
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="w-24">
-                  <Label className="text-white/50 text-xs mb-1 block">%</Label>
+                <div className="w-32">
+                  <Label className="text-white/50 text-xs mb-1 block">
+                    {activeTab === 'valor' ? 'Valor (R$) *' : '% *'}
+                  </Label>
+                  {activeTab === 'valor' ? (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={rateio.valor || ''}
+                      onChange={(e) => updateRateio(index, 'valor', parseFloat(e.target.value) || 0)}
+                      placeholder="0,00"
+                      className="bg-white/5 border-white/10 text-white"
+                    />
+                  ) : (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={rateio.percentual || ''}
+                      onChange={(e) => updateRateio(index, 'percentual', parseFloat(e.target.value) || 0)}
+                      placeholder="0%"
+                      className="bg-white/5 border-white/10 text-white"
+                    />
+                  )}
+                </div>
+                <div className="w-28">
+                  <Label className="text-white/50 text-xs mb-1 block">
+                    {activeTab === 'valor' ? '%' : 'Valor'}
+                  </Label>
                   <div className="h-10 flex items-center text-sm font-medium text-white/60">
-                    {calcularPercentual(rateio.valor)}%
+                    {activeTab === 'valor' 
+                      ? `${rateio.percentual.toFixed(2)}%`
+                      : formatCurrency(rateio.valor)
+                    }
                   </div>
                 </div>
                 <Button
@@ -250,22 +374,31 @@ export function Rateio({ store }: RateioProps) {
           {/* Resumo */}
           {rateios.length > 0 && (
             <div className="bg-[#0f0f16] p-4 rounded-lg border border-white/5">
-              <div className="flex items-center justify-between">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-white/50 text-sm">Valor Total do Pagamento</p>
-                  <p className="text-xl font-bold text-white">{formatCurrency(parseFloat(valorTotal) || 0)}</p>
+                  <p className="text-xl font-bold text-white">{formatCurrency(valorTotalNum)}</p>
                 </div>
-                <div className="text-right">
+                <div>
                   <p className="text-white/50 text-sm">Total Rateado</p>
-                  <p className={`text-xl font-bold ${calcularTotalRateio() === (parseFloat(valorTotal) || 0) ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {formatCurrency(calcularTotalRateio())}
+                  <p className={`text-xl font-bold ${Math.abs(totalRateio - valorTotalNum) < 0.01 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {formatCurrency(totalRateio)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/50 text-sm">Total Percentual</p>
+                  <p className={`text-xl font-bold ${totalPercentual === 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {totalPercentual.toFixed(2)}%
                   </p>
                 </div>
               </div>
-              {calcularTotalRateio() !== (parseFloat(valorTotal) || 0) && (
+              {!isBalanced && (
                 <p className="text-sm text-amber-400 mt-2 flex items-center gap-1">
                   <AlertCircle className="h-4 w-4" />
-                  O valor rateado não corresponde ao valor total do pagamento
+                  {Math.abs(totalRateio - valorTotalNum) >= 0.01 
+                    ? 'O valor rateado não corresponde ao valor total do pagamento'
+                    : 'O percentual total deve ser 100%'
+                  }
                 </p>
               )}
             </div>
@@ -274,7 +407,7 @@ export function Rateio({ store }: RateioProps) {
           {/* Botão de Salvar */}
           <Button
             onClick={handleSubmit}
-            disabled={!valorTotal || !descricao || rateios.length === 0 || calcularTotalRateio() !== (parseFloat(valorTotal) || 0)}
+            disabled={!valorTotal || !descricao || rateios.length === 0 || !isBalanced}
             className="w-full bg-emerald-600 hover:bg-emerald-700"
           >
             <Calculator className="h-4 w-4 mr-2" />
@@ -300,9 +433,10 @@ export function Rateio({ store }: RateioProps) {
           <ul className="text-sm text-blue-400/80 space-y-1 list-disc list-inside">
             <li>Informe o valor total do pagamento e a forma de pagamento</li>
             <li>Adicione as obras que receberão parte do valor</li>
-            <li>Defina o valor para cada obra (ou percentual)</li>
+            <li>Defina a categoria de cada rateio (Mão de Obra, Material, etc.)</li>
+            <li>Use o modo "Por Valor" ou "Por Percentual"</li>
+            <li>Clique em "Distribuir Igualmente" para dividir automaticamente</li>
             <li>O sistema criará automaticamente um lançamento para cada obra</li>
-            <li>Todos os lançamentos serão vinculados ao mesmo funcionário/pagamento</li>
           </ul>
         </CardContent>
       </Card>

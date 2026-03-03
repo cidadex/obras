@@ -395,10 +395,13 @@ export function Dashboard({ store, onViewChange }: DashboardProps) {
                 <div className="mt-4">
                   <div className="flex justify-between text-xs text-white/40 mb-1">
                     <span>Progresso</span>
-                    <span>65%</span>
+                    <span>{obra.obra.percentualConclusao}%</span>
                   </div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full w-[65%] bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" />
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all" 
+                      style={{ width: `${obra.obra.percentualConclusao}%` }}
+                    />
                   </div>
                 </div>
               </CardContent>

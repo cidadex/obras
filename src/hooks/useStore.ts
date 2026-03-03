@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type {
   Obra,
   Cliente,
@@ -19,7 +19,7 @@ import type {
   FiltroRelatorio,
 } from '@/types';
 
-// Dados iniciais de exemplo
+// Dados iniciais de exemplo (usados apenas na primeira vez)
 const obrasIniciais: Obra[] = [
   {
     id: '1',
@@ -33,6 +33,7 @@ const obrasIniciais: Obra[] = [
     orcamentoPrevisto: 2000000,
     responsavel: 'Carlos Silva',
     descricao: 'Condomínio residencial com 20 unidades',
+    percentualConclusao: 65,
   },
   {
     id: '2',
@@ -46,6 +47,7 @@ const obrasIniciais: Obra[] = [
     orcamentoPrevisto: 3800000,
     responsavel: 'Ana Paula',
     descricao: 'Centro comercial com 15 lojas',
+    percentualConclusao: 40,
   },
   {
     id: '3',
@@ -59,6 +61,7 @@ const obrasIniciais: Obra[] = [
     orcamentoPrevisto: 650000,
     responsavel: 'Pedro Henrique',
     descricao: 'Reforma completa de escola municipal',
+    percentualConclusao: 80,
   },
 ];
 
@@ -239,25 +242,90 @@ const composicoesIniciais: ComposicaoServico[] = [
   },
 ];
 
-export function useStore() {
-  // Estados
-  const [obras, setObras] = useState<Obra[]>(obrasIniciais);
-  const [clientes, setClientes] = useState<Cliente[]>(clientesIniciais);
-  const [funcionarios, setFuncionarios] = useState<Funcionario[]>(funcionariosIniciais);
-  const [socios, setSocios] = useState<Socio[]>(sociosIniciais);
-  const [movimentacoesSocios, setMovimentacoesSocios] = useState<MovimentacaoSocio[]>([]);
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(fornecedoresIniciais);
-  const [lancamentosEntrada, setLancamentosEntrada] = useState<LancamentoEntrada[]>([]);
-  const [lancamentosSaida, setLancamentosSaida] = useState<LancamentoSaida[]>([]);
-  const [recibos, setRecibos] = useState<Recibo[]>([]);
-  const [composicoes, setComposicoes] = useState<ComposicaoServico[]>(composicoesIniciais);
-  const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
-  const [extratoBancario, setExtratoBancario] = useState<ExtratoBancario[]>([]);
-  const [historicoReajustes, setHistoricoReajustes] = useState<HistoricoReajuste[]>([]);
+// Helper para localStorage
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const item = window.localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
 
-  // Contadores para números automáticos
-  const [nextReciboNumero, setNextReciboNumero] = useState(1);
-  const [nextOrcamentoNumero, setNextOrcamentoNumero] = useState(1);
+const saveToStorage = <T,>(key: string, value: T) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Erro ao salvar ${key}:`, error);
+  }
+};
+
+export function useStore() {
+  // Estados com persistência
+  const [obras, setObras] = useState<Obra[]>(() => 
+    loadFromStorage('obras', obrasIniciais)
+  );
+  const [clientes, setClientes] = useState<Cliente[]>(() => 
+    loadFromStorage('clientes', clientesIniciais)
+  );
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>(() => 
+    loadFromStorage('funcionarios', funcionariosIniciais)
+  );
+  const [socios, setSocios] = useState<Socio[]>(() => 
+    loadFromStorage('socios', sociosIniciais)
+  );
+  const [movimentacoesSocios, setMovimentacoesSocios] = useState<MovimentacaoSocio[]>(() => 
+    loadFromStorage('movimentacoesSocios', [])
+  );
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(() => 
+    loadFromStorage('fornecedores', fornecedoresIniciais)
+  );
+  const [lancamentosEntrada, setLancamentosEntrada] = useState<LancamentoEntrada[]>(() => 
+    loadFromStorage('lancamentosEntrada', [])
+  );
+  const [lancamentosSaida, setLancamentosSaida] = useState<LancamentoSaida[]>(() => 
+    loadFromStorage('lancamentosSaida', [])
+  );
+  const [recibos, setRecibos] = useState<Recibo[]>(() => 
+    loadFromStorage('recibos', [])
+  );
+  const [composicoes, setComposicoes] = useState<ComposicaoServico[]>(() => 
+    loadFromStorage('composicoes', composicoesIniciais)
+  );
+  const [orcamentos, setOrcamentos] = useState<Orcamento[]>(() => 
+    loadFromStorage('orcamentos', [])
+  );
+  const [extratoBancario, setExtratoBancario] = useState<ExtratoBancario[]>(() => 
+    loadFromStorage('extratoBancario', [])
+  );
+  const [historicoReajustes, setHistoricoReajustes] = useState<HistoricoReajuste[]>(() => 
+    loadFromStorage('historicoReajustes', [])
+  );
+  const [nextReciboNumero, setNextReciboNumero] = useState<number>(() => 
+    loadFromStorage('nextReciboNumero', 1)
+  );
+  const [nextOrcamentoNumero, setNextOrcamentoNumero] = useState<number>(() => 
+    loadFromStorage('nextOrcamentoNumero', 1)
+  );
+
+  // Persistir automaticamente quando os dados mudam
+  useEffect(() => saveToStorage('obras', obras), [obras]);
+  useEffect(() => saveToStorage('clientes', clientes), [clientes]);
+  useEffect(() => saveToStorage('funcionarios', funcionarios), [funcionarios]);
+  useEffect(() => saveToStorage('socios', socios), [socios]);
+  useEffect(() => saveToStorage('movimentacoesSocios', movimentacoesSocios), [movimentacoesSocios]);
+  useEffect(() => saveToStorage('fornecedores', fornecedores), [fornecedores]);
+  useEffect(() => saveToStorage('lancamentosEntrada', lancamentosEntrada), [lancamentosEntrada]);
+  useEffect(() => saveToStorage('lancamentosSaida', lancamentosSaida), [lancamentosSaida]);
+  useEffect(() => saveToStorage('recibos', recibos), [recibos]);
+  useEffect(() => saveToStorage('composicoes', composicoes), [composicoes]);
+  useEffect(() => saveToStorage('orcamentos', orcamentos), [orcamentos]);
+  useEffect(() => saveToStorage('extratoBancario', extratoBancario), [extratoBancario]);
+  useEffect(() => saveToStorage('historicoReajustes', historicoReajustes), [historicoReajustes]);
+  useEffect(() => saveToStorage('nextReciboNumero', nextReciboNumero), [nextReciboNumero]);
+  useEffect(() => saveToStorage('nextOrcamentoNumero', nextOrcamentoNumero), [nextOrcamentoNumero]);
 
   // Helpers
   const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -531,6 +599,12 @@ export function useStore() {
       custoPorCategoriaMap.set(s.categoria, atual + s.valor);
     });
 
+    // Histórico de movimentações (entradas e saídas ordenadas por data)
+    const historicoMovimentacoes = [
+      ...entradas.map(e => ({ ...e, tipo: 'entrada' as const })),
+      ...saidas.map(s => ({ ...s, tipo: 'saida' as const })),
+    ].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
     return {
       obra,
       totalEntradas,
@@ -546,6 +620,7 @@ export function useStore() {
         categoria,
         total,
       })),
+      historicoMovimentacoes,
     };
   }, [obras, lancamentosEntrada, lancamentosSaida, funcionarios]);
 
@@ -670,6 +745,48 @@ export function useStore() {
     return { entradas, saidas };
   }, [lancamentosEntrada, lancamentosSaida]);
 
+  // Limpar todos os dados
+  const clearAllData = useCallback(() => {
+    if (confirm('Tem certeza que deseja limpar TODOS os dados? Esta ação não pode ser desfeita.')) {
+      setObras([]);
+      setClientes([]);
+      setFuncionarios([]);
+      setSocios([]);
+      setMovimentacoesSocios([]);
+      setFornecedores([]);
+      setLancamentosEntrada([]);
+      setLancamentosSaida([]);
+      setRecibos([]);
+      setComposicoes([]);
+      setOrcamentos([]);
+      setExtratoBancario([]);
+      setHistoricoReajustes([]);
+      setNextReciboNumero(1);
+      setNextOrcamentoNumero(1);
+    }
+  }, []);
+
+  // Reset para dados iniciais
+  const resetToInitialData = useCallback(() => {
+    if (confirm('Tem certeza que deseja restaurar os dados iniciais de exemplo?')) {
+      setObras(obrasIniciais);
+      setClientes(clientesIniciais);
+      setFuncionarios(funcionariosIniciais);
+      setSocios(sociosIniciais);
+      setMovimentacoesSocios([]);
+      setFornecedores(fornecedoresIniciais);
+      setLancamentosEntrada([]);
+      setLancamentosSaida([]);
+      setRecibos([]);
+      setComposicoes(composicoesIniciais);
+      setOrcamentos([]);
+      setExtratoBancario([]);
+      setHistoricoReajustes([]);
+      setNextReciboNumero(1);
+      setNextOrcamentoNumero(1);
+    }
+  }, []);
+
   return {
     // Dados
     obras,
@@ -749,6 +866,10 @@ export function useStore() {
     getResumoObra,
     getDashboardData,
     filtrarLancamentos,
+
+    // Utilitários
+    clearAllData,
+    resetToInitialData,
   };
 }
 
